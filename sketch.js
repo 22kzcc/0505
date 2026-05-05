@@ -4,7 +4,7 @@ let predictions = [];
 let displayW, displayH;
 
 // --- 各部位特徵點陣列 ---
-// 1. 保留原本的嘴唇
+// 1. 保留原本的嘴唇 (原本是粗線條，現在改細)
 const pointIndices = [409, 270, 269, 267, 0, 37, 39, 40, 185, 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
 
 // 2. 新增的嘴唇線條
@@ -38,15 +38,15 @@ function setup() {
 }
 
 function draw() {
-  // 確保保留你原本的粉紅背景
+  // 保留粉紅背景
   background('#e7c6ff');
 
-  // 確保保留你原本的文字設定
+  // 更新顯示文字與設定
   noStroke();
   fill(0); 
   textSize(windowHeight * 0.04); 
   textAlign(CENTER, CENTER);
-  text("教科123456789", width / 2, height * 0.15);
+  text("教科414730118", width / 2, height * 0.15); // 文字已更新
 
   // 影像與辨識線條處理
   push();
@@ -99,12 +99,12 @@ function drawFacemeshLines() {
     strokeWeight(2);
     drawLineSequence(keypoints, faceOutlineIndices, true);
 
-    // 2. 保留你最原始的嘴唇設定 (紅色，粗細 15)
+    // 2. 原本的嘴唇設定 (紅色，已將粗細改為 1)
     stroke(255, 0, 0);
-    strokeWeight(15);
+    strokeWeight(1); 
     drawLineSequence(keypoints, pointIndices, true);
 
-    // 3. 你新要求的嘴唇線條 (紅色，粗細 1)
+    // 3. 新要求的嘴唇線條 (紅色，粗細 1)
     stroke(255, 0, 0);
     strokeWeight(1);
     drawLineSequence(keypoints, newMouthIndices, true);
