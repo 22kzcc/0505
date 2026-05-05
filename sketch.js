@@ -3,23 +3,30 @@ let facemesh;
 let predictions = [];
 let displayW, displayH;
 
-// 定義需要連線的特徵點編號
-const pointIndices = [409, 270, 269, 267, 0, 37, 39, 40, 185, 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
+// --- 1. 定義各部位的特徵點編號陣列 ---
+
+// 保留原本的嘴唇
+const lipsIndices = [409, 270, 269, 267, 0, 37, 39, 40, 185, 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
+
+// 右眼輪廓 (MediaPipe 標準右眼特徵點)
+const rightEyeIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398];
+
+// 左眼輪廓 (MediaPipe 標準左眼特徵點，246 就在這個結構的眼角附近)
+const leftEyeIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
+
+// 臉部最外層輪廓
+const faceOutlineIndices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
 
 function setup() {
-  // 1. 產生全螢幕畫布
   createCanvas(windowWidth, windowHeight);
   
-  // 設定影像顯示尺寸為畫布寬高的 50%
   displayW = width * 0.5;
   displayH = height * 0.5;
 
-  // 2. 初始化攝影機
   video = createCapture(VIDEO);
-  video.size(640, 480); // 這是內部辨識用的解析度
-  video.hide();         // 隱藏原始影像，我們要在畫布上自訂繪製
+  video.size(640, 480);
+  video.hide();
 
-  // 3. 初始化 Facemesh 辨識
   facemesh = ml5.facemesh(video, modelReady);
   facemesh.on("predict", results => {
     predictions = results;
@@ -31,61 +38,98 @@ function modelReady() {
 }
 
 function draw() {
-  // 4. 設定背景顏色
   background('#e7c6ff');
 
-  // 5. 在影像上方顯示文字
-  fill(0);                // 文字顏色 (黑色)
+  fill(0);
   textSize(32);
   textAlign(CENTER, CENTER);
-  // 位置置中於畫布，高度設在影像上方 (約為畫布高度的 15%)
   text("教科123456789", width / 2, height * 0.15);
 
-  // 6. 處理影像顯示 (置中、50% 尺寸、左右顛倒)
   push();
-  // 先位移到畫布中間
   translate(width / 2, height / 2);
-  // 執行水平翻轉 (左右顛倒)
   scale(-1, 1);
   
-  // 繪製影像 (使用影像模式 CENTER，讓 (0,0) 為影像中心點)
   imageMode(CENTER);
   image(video, 0, 0, displayW, displayH);
 
-  // 7. 臉部辨識連線處理
-  drawLines();
+  drawFeatures(); 
   
   pop();
 }
 
-function drawLines() {
+function drawFeatures() {
   if (predictions.length > 0) {
     let keypoints = predictions[0].scaledMesh;
 
-    stroke(255, 0, 0);       // 設定線條顏色為紅色
-    strokeWeight(15);        // 設定線條粗細為 15
-    noFill();
+    // --- 繪製臉部最外層輪廓 (藍色，線條粗細 2) ---
+    stroke(0, 0, 255);
+    strokeWeight(2);
+    drawPathWithLines(keypoints, faceOutlineIndices, true);
 
-    beginShape();
-    for (let i = 0; i < pointIndices.length; i++) {
-      let index = pointIndices[i];
-      let p = keypoints[index];
+    // --- 保留嘴唇畫線 (紅色，線條粗細 15) ---
+    stroke(255, 0, 0);
+    strokeWeight(15);
+    drawPathWithLines(keypoints, lipsIndices, true);
 
-      // 將原始影像座標映射到畫布上的 50% 尺寸
-      // 由於我們在 draw() 已經 translate 到畫布中心，且使用了 scale(-1, 1)
-      // 這裡只需要將座標按比例轉換即可 (相對中心點的偏移)
-      let x = map(p[0], 0, video.width, -displayW / 2, displayW / 2);
-      let y = map(p[1], 0, video.height, -displayH / 2, displayH / 2);
+    // --- 繪製右眼 (綠色，線條粗細 2) ---
+    stroke(0, 255, 0); 
+    strokeWeight(2);
+    drawPathWithLines(keypoints, rightEyeIndices, true);
+
+    // --- 繪製左眼 (黃色，線條粗細 2) ---
+    stroke(255, 255, 0);
+    strokeWeight(2);
+    drawPathWithLines(keypoints, leftEyeIndices, true);
+
+    // --- 針對單一點位 247 與 246 獨立畫圈 ---
+    // 247 外圈
+    if (keypoints[247]) {
+      let p247 = keypoints[247];
+      let x247 = map(p247[0], 0, video.width, -displayW / 2, displayW / 2);
+      let y247 = map(p247[1], 0, video.height, -displayH / 2, displayH / 2);
       
-      vertex(x, y);
+      stroke(255, 100, 0); // 橘色表示外圈
+      strokeWeight(2);
+      noFill();
+      circle(x247, y247, 20); 
     }
-    // 若要將最後一點連回第一點形成封閉線條，可取消下面註解：
-    // endShape(CLOSE); 
-    endShape();
+
+    // 246 內圈
+    if (keypoints[246]) {
+      let p246 = keypoints[246];
+      let x246 = map(p246[0], 0, video.width, -displayW / 2, displayW / 2);
+      let y246 = map(p246[1], 0, video.height, -displayH / 2, displayH / 2);
+      
+      stroke(255, 200, 0); // 黃色表示內圈
+      strokeWeight(2);
+      noFill();
+      circle(x246, y246, 8); 
+    }
   }
 }
 
-// 視窗大小改變時，重新調整畫布
+// --- 2. 負責使用 line() 指令串接陣列特徵點的函式 ---
+function drawPathWithLines(keypoints, indices, isClosed) {
+  for (let i = 0; i < indices.length; i++) {
+    // 檢查是否需要將最後一點連回起點
+    if (i < indices.length - 1 || isClosed) {
+      let p1 = keypoints[indices[i]];
+      // 如果是最後一點且需要封閉，就連回陣列的第 0 個點
+      let nextIndex = (i === indices.length - 1) ? 0 : i + 1;
+      let p2 = keypoints[indices[nextIndex]];
+
+      // 將座標映射到目前的畫布比例上
+      let x1 = map(p1[0], 0, video.width, -displayW / 2, displayW / 2);
+      let y1 = map(p1[1], 0, video.height, -displayH / 2, displayH / 2);
+      let x2 = map(p2[0], 0, video.width, -displayW / 2, displayW / 2);
+      let y2 = map(p2[1], 0, video.height, -displayH / 2, displayH / 2);
+
+      // 使用 line 指令繪製兩點之間的連線
+      line(x1, y1, x2, y2);
+    }
+  }
+}
+
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   displayW = width * 0.5;
