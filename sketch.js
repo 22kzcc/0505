@@ -3,135 +3,171 @@ let facemesh;
 let predictions = [];
 let displayW, displayH;
 
-// --- 1. 定義各部位的特徵點編號陣列 ---
+// --- 各部位特徵點陣列 ---
+// 1. 保留原本的嘴唇
+const pointIndices = [409, 270, 269, 267, 0, 37, 39, 40, 185, 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
 
-// 保留原本的嘴唇
-const lipsIndices = [409, 270, 269, 267, 0, 37, 39, 40, 185, 61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
+// 2. 新增的嘴唇線條
+const newMouthIndices = [76, 77, 90, 180, 85, 16, 315, 404, 320, 307, 306, 408, 304, 303, 302, 11, 72, 73, 74, 184];
 
-// 右眼輪廓 (MediaPipe 標準右眼特徵點)
+// 3. 右眼與左眼
 const rightEyeIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398];
-
-// 左眼輪廓 (MediaPipe 標準左眼特徵點，246 就在這個結構的眼角附近)
 const leftEyeIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
 
-// 臉部最外層輪廓
+// 4. 臉部最外層輪廓
 const faceOutlineIndices = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
 
+
 function setup() {
+  // 產生全螢幕畫布
   createCanvas(windowWidth, windowHeight);
   
-  displayW = width * 0.5;
-  displayH = height * 0.5;
+  // 計算影像顯示尺寸
+  updateDisplaySize();
 
+  // 設定攝影機
   video = createCapture(VIDEO);
   video.size(640, 480);
   video.hide();
 
-  facemesh = ml5.facemesh(video, modelReady);
+  // 初始化 Facemesh
+  facemesh = ml5.facemesh(video, () => console.log("模型準備完畢！"));
   facemesh.on("predict", results => {
     predictions = results;
   });
 }
 
-function modelReady() {
-  console.log("Model Ready!");
-}
-
 function draw() {
+  // 確保保留你原本的粉紅背景
   background('#e7c6ff');
 
-  fill(0);
-  textSize(32);
+  // 確保保留你原本的文字設定
+  noStroke();
+  fill(0); 
+  textSize(windowHeight * 0.04); 
   textAlign(CENTER, CENTER);
   text("教科123456789", width / 2, height * 0.15);
 
+  // 影像與辨識線條處理
   push();
   translate(width / 2, height / 2);
   scale(-1, 1);
   
+  // 繪製影像
   imageMode(CENTER);
   image(video, 0, 0, displayW, displayH);
 
-  drawFeatures(); 
-  
+  // 繪製所有臉部特徵
+  drawFacemeshLines();
   pop();
 }
 
-function drawFeatures() {
+function drawFacemeshLines() {
   if (predictions.length > 0) {
     let keypoints = predictions[0].scaledMesh;
 
-    // --- 繪製臉部最外層輪廓 (藍色，線條粗細 2) ---
-    stroke(0, 0, 255);
-    strokeWeight(2);
-    drawPathWithLines(keypoints, faceOutlineIndices, true);
+    // ==========================================
+    // 第一步：在臉部外層輪廓外填滿 #fdf0d5 (遮罩效果)
+    // ==========================================
+    fill('#fdf0d5');
+    noStroke();
+    beginShape();
+    // 1. 順時針畫出整個影片的外框
+    vertex(-displayW / 2, -displayH / 2);
+    vertex(displayW / 2, -displayH / 2);
+    vertex(displayW / 2, displayH / 2);
+    vertex(-displayW / 2, displayH / 2);
 
-    // --- 保留嘴唇畫線 (紅色，線條粗細 15) ---
+    // 2. 逆時針畫出臉部輪廓，將臉部的部分「挖空」
+    beginContour();
+    for (let i = faceOutlineIndices.length - 1; i >= 0; i--) {
+      let p = keypoints[faceOutlineIndices[i]];
+      let x = map(p[0], 0, video.width, -displayW / 2, displayW / 2);
+      let y = map(p[1], 0, video.height, -displayH / 2, displayH / 2);
+      vertex(x, y);
+    }
+    endContour();
+    endShape(CLOSE);
+
+
+    // ==========================================
+    // 第二步：繪製特徵點線條 (全面使用 line 指令)
+    // ==========================================
+
+    // 1. 臉部輪廓 (螢光藍色，粗細 2)
+    stroke(0, 255, 255); // 螢光藍色
+    strokeWeight(2);
+    drawLineSequence(keypoints, faceOutlineIndices, true);
+
+    // 2. 保留你最原始的嘴唇設定 (紅色，粗細 15)
     stroke(255, 0, 0);
     strokeWeight(15);
-    drawPathWithLines(keypoints, lipsIndices, true);
+    drawLineSequence(keypoints, pointIndices, true);
 
-    // --- 繪製右眼 (綠色，線條粗細 2) ---
-    stroke(0, 255, 0); 
-    strokeWeight(2);
-    drawPathWithLines(keypoints, rightEyeIndices, true);
+    // 3. 你新要求的嘴唇線條 (紅色，粗細 1)
+    stroke(255, 0, 0);
+    strokeWeight(1);
+    drawLineSequence(keypoints, newMouthIndices, true);
 
-    // --- 繪製左眼 (黃色，線條粗細 2) ---
-    stroke(255, 255, 0);
-    strokeWeight(2);
-    drawPathWithLines(keypoints, leftEyeIndices, true);
+    // 4. 左眼與右眼 - 黑眼圈效果 (灰色偏黑，粗細 15)
+    stroke(50, 50, 50); // 偏黑的灰色
+    strokeWeight(15);
+    drawLineSequence(keypoints, rightEyeIndices, true);
+    drawLineSequence(keypoints, leftEyeIndices, true);
 
-    // --- 針對單一點位 247 與 246 獨立畫圈 ---
-    // 247 外圈
+    // 5. 獨立繪製 247 外圈 與 246 內圈
     if (keypoints[247]) {
       let p247 = keypoints[247];
       let x247 = map(p247[0], 0, video.width, -displayW / 2, displayW / 2);
       let y247 = map(p247[1], 0, video.height, -displayH / 2, displayH / 2);
-      
-      stroke(255, 100, 0); // 橘色表示外圈
+      stroke(200); // 淺灰色
       strokeWeight(2);
       noFill();
-      circle(x247, y247, 20); 
+      circle(x247, y247, 20); // 247 外圈
     }
 
-    // 246 內圈
     if (keypoints[246]) {
       let p246 = keypoints[246];
       let x246 = map(p246[0], 0, video.width, -displayW / 2, displayW / 2);
       let y246 = map(p246[1], 0, video.height, -displayH / 2, displayH / 2);
-      
-      stroke(255, 200, 0); // 黃色表示內圈
+      stroke(100); // 深灰色
       strokeWeight(2);
       noFill();
-      circle(x246, y246, 8); 
+      circle(x246, y246, 8); // 246 內圈
     }
   }
 }
 
-// --- 2. 負責使用 line() 指令串接陣列特徵點的函式 ---
-function drawPathWithLines(keypoints, indices, isClosed) {
-  for (let i = 0; i < indices.length; i++) {
-    // 檢查是否需要將最後一點連回起點
-    if (i < indices.length - 1 || isClosed) {
-      let p1 = keypoints[indices[i]];
-      // 如果是最後一點且需要封閉，就連回陣列的第 0 個點
-      let nextIndex = (i === indices.length - 1) ? 0 : i + 1;
-      let p2 = keypoints[indices[nextIndex]];
-
-      // 將座標映射到目前的畫布比例上
-      let x1 = map(p1[0], 0, video.width, -displayW / 2, displayW / 2);
-      let y1 = map(p1[1], 0, video.height, -displayH / 2, displayH / 2);
-      let x2 = map(p2[0], 0, video.width, -displayW / 2, displayW / 2);
-      let y2 = map(p2[1], 0, video.height, -displayH / 2, displayH / 2);
-
-      // 使用 line 指令繪製兩點之間的連線
-      line(x1, y1, x2, y2);
-    }
+// 輔助函式：使用純 line() 指令將陣列點位串聯起來
+function drawLineSequence(keypoints, indices, isClosed) {
+  for (let i = 0; i < indices.length - 1; i++) {
+    let p1 = keypoints[indices[i]];
+    let p2 = keypoints[indices[i + 1]];
+    let x1 = map(p1[0], 0, video.width, -displayW / 2, displayW / 2);
+    let y1 = map(p1[1], 0, video.height, -displayH / 2, displayH / 2);
+    let x2 = map(p2[0], 0, video.width, -displayW / 2, displayW / 2);
+    let y2 = map(p2[1], 0, video.height, -displayH / 2, displayH / 2);
+    line(x1, y1, x2, y2);
   }
+  
+  // 如果需要頭尾相連
+  if (isClosed) {
+    let p1 = keypoints[indices[indices.length - 1]];
+    let p2 = keypoints[indices[0]];
+    let x1 = map(p1[0], 0, video.width, -displayW / 2, displayW / 2);
+    let y1 = map(p1[1], 0, video.height, -displayH / 2, displayH / 2);
+    let x2 = map(p2[0], 0, video.width, -displayW / 2, displayW / 2);
+    let y2 = map(p2[1], 0, video.height, -displayH / 2, displayH / 2);
+    line(x1, y1, x2, y2);
+  }
+}
+
+function updateDisplaySize() {
+  displayW = width * 0.5;
+  displayH = height * 0.5;
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  displayW = width * 0.5;
-  displayH = height * 0.5;
+  updateDisplaySize();
 }
