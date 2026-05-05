@@ -46,7 +46,7 @@ function draw() {
   fill(0); 
   textSize(windowHeight * 0.04); 
   textAlign(CENTER, CENTER);
-  text("教科414730118", width / 2, height * 0.15); // 文字已更新
+  text("教科414730118", width / 2, height * 0.15); text("教科414730118", width / 2, height * 0.15);// 文字已更新
 
   // 影像與辨識線條處理
   push();
